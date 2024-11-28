@@ -29,6 +29,7 @@ type handler struct {
 	next            slog.Handler
 	writeLock       *sync.Mutex
 	currentPriority journal.Priority
+	raw             bool
 }
 
 func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -51,7 +52,13 @@ func (h *handler) WithGroup(name string) slog.Handler {
 }
 
 func (h *handler) Write(p []byte) (n int, err error) {
-	stringData := string(p)
+	var stringData string
+	if h.raw {
+		stringData = string(p[3:])
+	} else {
+		stringData = string(p)
+	}
+
 	if err := journal.Send(stringData, h.currentPriority, nil); err != nil {
 		return 0, &motmedelErrors.InputError{
 			Message: "An error occurred when writing.",
@@ -66,5 +73,22 @@ func (h *handler) Write(p []byte) (n int, err error) {
 func NewJsonHandler(handlerOptions *slog.HandlerOptions) slog.Handler {
 	h := &handler{writeLock: &sync.Mutex{}}
 	h.next = slog.NewJSONHandler(h, handlerOptions)
+	return h
+}
+
+func rawReplaceAttr(groups []string, attr slog.Attr) slog.Attr {
+	if attr.Key == slog.MessageKey {
+		attr.Key = ""
+	} else {
+		attr = slog.Any("", nil)
+	}
+
+	return attr
+}
+
+func NewRawHandler(level slog.Leveler) slog.Handler {
+	h := &handler{writeLock: &sync.Mutex{}, raw: true}
+	h.next = slog.NewTextHandler(h, &slog.HandlerOptions{ReplaceAttr: rawReplaceAttr, Level: level})
+
 	return h
 }
