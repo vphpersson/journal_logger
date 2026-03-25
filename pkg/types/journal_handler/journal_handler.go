@@ -72,12 +72,10 @@ func (h *Handler) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func New(handler slog.Handler) *Handler {
-	return &Handler{
-		Next:            handler,
-		writeLock:       &sync.Mutex{},
-		currentPriority: new(journal.Priority),
-	}
+func NewJsonHandler(handlerOptions *slog.HandlerOptions) *Handler {
+	handler := &Handler{writeLock: &sync.Mutex{}, currentPriority: new(journal.Priority)}
+	handler.Next = slog.NewJSONHandler(handler, handlerOptions)
+	return handler
 }
 
 func rawReplaceAttr(groups []string, attr slog.Attr) slog.Attr {
@@ -90,7 +88,7 @@ func rawReplaceAttr(groups []string, attr slog.Attr) slog.Attr {
 	return attr
 }
 
-func NewRaw(handlerOptions *slog.HandlerOptions) *Handler {
+func NewTextHandler(handlerOptions *slog.HandlerOptions) *Handler {
 	if handlerOptions == nil {
 		handlerOptions = &slog.HandlerOptions{}
 	}
@@ -99,11 +97,7 @@ func NewRaw(handlerOptions *slog.HandlerOptions) *Handler {
 		handlerOptions.ReplaceAttr = rawReplaceAttr
 	}
 
-	h := &Handler{
-		Raw:             true,
-		writeLock:       &sync.Mutex{},
-		currentPriority: new(journal.Priority),
-	}
-	h.Next = slog.NewTextHandler(h, handlerOptions)
-	return h
+	handler := &Handler{Raw: true, writeLock: &sync.Mutex{}, currentPriority: new(journal.Priority)}
+	handler.Next = slog.NewTextHandler(handler, handlerOptions)
+	return handler
 }
